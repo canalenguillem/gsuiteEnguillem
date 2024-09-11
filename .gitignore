@@ -1,0 +1,35 @@
+# Ignorar fitxers de credencials
+*.json
+
+# Ignorar fitxers CSV
+*.csv
+
+# Ignorar fitxers Excel
+*.xls
+*.xlsx
+
+# Ignorar fitxers de logs
+*.log
+
+# Ignorar fitxers i carpetes de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Ignorar configuracions d'entorns virtuals
+env/
+venv/
+ENV/
+venv.bak/
+.venv
+.env
+
+# Ignorar fitxers de l'editor (com Visual Studio Code)
+.vscode/
+.idea/
+
+# Ignorar altres fitxers del sistema operatiu
+.DS_Store
+Thumbs.db
