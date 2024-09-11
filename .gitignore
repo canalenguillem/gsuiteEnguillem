@@ -33,3 +33,4 @@ venv.bak/
 # Ignorar altres fitxers del sistema operatiu
 .DS_Store
 Thumbs.db
+.~lock.CFGM_SMX_B.xls#

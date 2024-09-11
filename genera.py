@@ -49,20 +49,18 @@ def generar_csv_i_excel_amb_emails(input_file, password, org_unit_path, output_b
     print(f"chars {chars}")
     print("____________________________")
 
-    
     # Crear noves columnes per a Email Address, Password i Org Unit Path
     df['Email Address'] = df['Llinatges i nom'].apply(lambda x: generar_email(x, chars))
     df['Password'] = password
     df['Org Unit Path'] = org_unit_path
     
-    # Seleccionar les columnes necessàries per a l'arxiu de sortida
-    df_output = df[['Llinatges i nom', 'Llinatges i nom', 'Email Address', 'Password', 'Org Unit Path']]
-    
     # Separar les columnes de "Llinatges i nom" en "First Name" i "Last Name"
-    df_output[['First Name', 'Last Name']] = df['Llinatges i nom'].str.split(", ", expand=True)
+    df_output = df['Llinatges i nom'].str.split(", ", expand=True)
+    df['Last Name'] = df_output[0]
+    df['First Name'] = df_output[1]
 
-    # Reordenar les columnes
-    df_output = df_output[['First Name', 'Last Name', 'Email Address', 'Password', 'Org Unit Path']]
+    # Seleccionar les columnes necessàries per a l'arxiu de sortida
+    df_output = df[['First Name', 'Last Name', 'Email Address', 'Password', 'Org Unit Path']]
 
     # Generar els noms de fitxers per a CSV i Excel utilitzant el mateix nom base
     output_csv = f"{output_base}.csv"
