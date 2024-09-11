@@ -90,7 +90,7 @@ def registrar_canvi(log_file, missatge):
         log.write(f"{timestamp} - {missatge}\n")
 
 # Funció principal per llegir el CSV, comprovar si els correus existeixen, gestionar la unitat organitzativa, crear usuaris i generar els CSV amb els usuaris nous i els existents
-def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, org_unit_expected=None, create_users='N'):
+def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users='N'):
     # Connectar-se amb l'API de Google
     service = connectar_amb_google(credentials_file, admin_email)
 
@@ -110,7 +110,7 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, org_unit_expe
         first_name = row['First Name']
         last_name = row['Last Name']
         password = row['Password']
-        org_unit_path = row['Org Unit Path']
+        org_unit_path = row['Org Unit Path']  # Agafem la unitat organitzativa directament del CSV
 
         existeix, org_unit_actual, nom_servidor, cognoms_servidor = usuari_existeix(service, email)
         if existeix:
@@ -118,11 +118,11 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, org_unit_expe
             if first_name.lower() == nom_servidor.lower() and last_name.lower() == cognoms_servidor.lower():
                 print(f"L'usuari {email} ja existeix i els noms coincideixen.")
                 # Comprovar si s'ha de canviar la unitat organitzativa
-                if org_unit_expected and org_unit_actual != org_unit_expected:
-                    resposta = input(f"L'usuari {email} està a {org_unit_actual}. Vols actualitzar-lo a {org_unit_expected}? (S/n): ").strip().lower()
+                if org_unit_actual != org_unit_path:
+                    resposta = input(f"L'usuari {email} està a {org_unit_actual}. Vols actualitzar-lo a {org_unit_path}? (S/n): ").strip().lower()
                     if resposta in ['s', '']:
-                        if actualitzar_unitat_organitzativa(service, email, org_unit_expected):
-                            registrar_canvi(log_file, f"Actualitzada la unitat organitzativa de {email} a {org_unit_expected}")
+                        if actualitzar_unitat_organitzativa(service, email, org_unit_path):
+                            registrar_canvi(log_file, f"Actualitzada la unitat organitzativa de {email} a {org_unit_path}")
             else:
                 # Informar que els noms no coincideixen i mostrar els noms del servidor i del fitxer CSV
                 print(f"L'usuari {email} ja existeix però els noms no coincideixen.")
@@ -204,11 +204,10 @@ if __name__ == '__main__':
     parser.add_argument('--credentials-file', type=str, required=True, help='El fitxer de credencials JSON de la Service Account.')
     parser.add_argument('--admin-email', type=str, required=True, help='El correu electrònic de l\'administrador del domini.')
     parser.add_argument('--csv-file', type=str, required=True, help='El fitxer CSV amb els usuaris a comprovar.')
-    parser.add_argument('--org-unit-expected', type=str, default=None, help='(Opcional) La unitat organitzativa esperada per als usuaris existents.')
     parser.add_argument('--create-users', type=str, default='N', help='(Opcional) Si s\'han de crear els usuaris que no existeixen (S per crear-los, N per defecte).')
 
     # Obtenir els arguments
     args = parser.parse_args()
 
     # Cridar la funció per comprovar els usuaris i crear-los si no existeixen i si --create-users és S
-    comprovar_usuaris_csv(args.credentials_file, args.admin_email, args.csv_file, args.org_unit_expected, args.create_users)
+    comprovar_usuaris_csv(args.credentials_file, args.admin_email, args.csv_file, args.create_users)
