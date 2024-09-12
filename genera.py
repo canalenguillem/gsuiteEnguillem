@@ -1,6 +1,8 @@
+import os
 import pandas as pd
 import argparse
 import unidecode
+from datetime import datetime
 
 # Funció per generar l'adreça de correu electrònic correctament
 def generar_email(nom_complet, chars):
@@ -45,10 +47,17 @@ def llegir_fitxer(input_file):
 def generar_csv_i_excel_amb_emails(input_file, password, org_unit_path, output_base, chars):
     # Llegir el fitxer (sigui CSV o Excel)
     df = llegir_fitxer(input_file)
-    print("____________________________")
-    print(f"chars {chars}")
-    print("____________________________")
+    
+    # Crear la carpeta logs si no existeix
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
 
+    # Crear el fitxer de log dins de la carpeta logs
+    log_file = os.path.join('logs', datetime.now().strftime(f"%Y-%m-%d-%H-%M-%S-{output_base}.log"))
+
+    with open(log_file, 'a') as log:
+        log.write(f"Creació del fitxer {output_base}.csv i {output_base}.xlsx\n")
+    
     # Crear noves columnes per a Email Address, Password i Org Unit Path
     df['Email Address'] = df['Llinatges i nom'].apply(lambda x: generar_email(x, chars))
     df['Password'] = password

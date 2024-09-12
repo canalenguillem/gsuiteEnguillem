@@ -5,89 +5,7 @@ from google.oauth2 import service_account
 import argparse
 import os
 from datetime import datetime
-
-# Funció per autenticar-se amb la Google API
-def connectar_amb_google(credentials_file, admin_email):
-    scopes = ['https://www.googleapis.com/auth/admin.directory.user']
-    
-    # Carregar les credencials de la Service Account
-    credentials = service_account.Credentials.from_service_account_file(
-        credentials_file, scopes=scopes)
-    
-    # Delegar l'autoritat al compte d'administrador
-    delegated_credentials = credentials.with_subject(admin_email)
-    
-    # Construir el servei de Google Admin SDK
-    service = build('admin', 'directory_v1', credentials=delegated_credentials)
-    return service
-
-# Funció per comprovar si un usuari existeix i obtenir la seva unitat organitzativa i nom complet
-def usuari_existeix(service, email):
-    try:
-        # Fer una petició per obtenir informació sobre l'usuari
-        usuari = service.users().get(userKey=email).execute()
-        org_unit_path = usuari.get('orgUnitPath', 'Sense assignar')  # Obtenir l'orgUnitPath de l'usuari
-        nom = usuari['name']['givenName']
-        cognoms = usuari['name']['familyName']
-        return True, org_unit_path, nom, cognoms
-    except Exception as e:
-        print(f"L'usuari {email} no existeix.")
-        return False, None, None, None
-
-# Funció per actualitzar la unitat organitzativa d'un usuari
-def actualitzar_unitat_organitzativa(service, email, nova_unitat):
-    try:
-        # Actualitzar la unitat organitzativa
-        service.users().update(userKey=email, body={'orgUnitPath': nova_unitat}).execute()
-        print(f"Unitat organitzativa actualitzada per a {email}. Nova unitat: {nova_unitat}")
-        return True
-    except Exception as e:
-        print(f"No s'ha pogut actualitzar la unitat organitzativa per a {email}: {e}")
-        return False
-
-# Funció per actualitzar el nom i cognoms d'un usuari
-def actualitzar_nom_i_cognoms(service, email, first_name, last_name):
-    try:
-        # Actualitzar nom i cognoms
-        body = {
-            'name': {
-                'givenName': first_name,
-                'familyName': last_name
-            }
-        }
-        service.users().update(userKey=email, body=body).execute()
-        print(f"Nom i cognoms actualitzats per a {email}: {first_name} {last_name}")
-        return True
-    except Exception as e:
-        print(f"No s'ha pogut actualitzar el nom i cognoms per a {email}: {e}")
-        return False
-
-# Funció per crear un nou usuari a Google Workspace
-def crear_usuari(service, first_name, last_name, email, password, org_unit_path, log_file):
-    try:
-        body = {
-            'name': {
-                'givenName': first_name,
-                'familyName': last_name,
-            },
-            'password': password,
-            'primaryEmail': email,
-            'orgUnitPath': org_unit_path
-        }
-        service.users().insert(body=body).execute()
-        print(f"Usuari {email} creat correctament.")
-        registrar_canvi(log_file, f"Usuari creat: {email}")
-        return True
-    except Exception as e:
-        print(f"No s'ha pogut crear l'usuari {email}: {e}")
-        registrar_canvi(log_file, f"Error en crear l'usuari: {email}. Error: {e}")
-        return False
-
-# Funció per registrar els canvis en un fitxer .log
-def registrar_canvi(log_file, missatge):
-    with open(log_file, 'a') as log:
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        log.write(f"{timestamp} - {missatge}\n")
+from functions import connectar_amb_google, usuari_existeix, actualitzar_unitat_organitzativa, actualitzar_nom_i_cognoms, registrar_canvi, crear_usuari
 
 # Funció principal per llegir el CSV, comprovar si els correus existeixen, gestionar la unitat organitzativa, crear usuaris i generar els CSV amb els usuaris nous i els existents
 def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users='N'):
@@ -96,6 +14,9 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users=
 
     # Llegir el CSV
     df = pd.read_csv(csv_file)
+
+    # Generar el nom base del fitxer CSV per usar-lo més tard en crear els fitxers news i olds
+    base_name = os.path.splitext(csv_file)[0]  # Afegeix aquesta línia
 
     # Generar el nom del fitxer log basat en la data i hora actuals
     log_file = datetime.now().strftime(f"%Y-%m-%d-%H-%M-%S-{os.path.basename(csv_file)}.log")
@@ -110,7 +31,7 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users=
         first_name = row['First Name']
         last_name = row['Last Name']
         password = row['Password']
-        org_unit_path = row['Org Unit Path']  # Agafem la unitat organitzativa directament del CSV
+        org_unit_path = row['Org Unit Path']
 
         existeix, org_unit_actual, nom_servidor, cognoms_servidor = usuari_existeix(service, email)
         if existeix:
@@ -150,16 +71,17 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users=
             # Afegeix l'usuari a la llista d'usuaris no existents
             usuaris_no_existents.append(row)
 
+    # Guarda els fitxers news i olds segons les funcions ja definides
+
     # Si hi ha usuaris que no existeixen, generar un nou CSV i un fitxer Excel
+    # Generar el timestamp per al nom del fitxer news
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M")
     if usuaris_no_existents:
         # Crear un nou DataFrame amb els usuaris que no existeixen
         df_no_existents = pd.DataFrame(usuaris_no_existents)
 
-        # Generar el timestamp per al nom del fitxer news
-        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M")
 
         # Generar el nom dels fitxers amb el sufix news-any-mes-dia-hora
-        base_name = os.path.splitext(csv_file)[0]
         new_csv_file = f"{base_name}_news-{timestamp}.csv"
         new_xls_file = f"{base_name}_news-{timestamp}.xlsx"
 
@@ -179,7 +101,6 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users=
         df_existents = pd.DataFrame(usuaris_existents)
 
         # Generar el nom dels fitxers amb el sufix olds-any-mes-dia-hora
-        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M")
         old_csv_file = f"{base_name}_olds-{timestamp}.csv"
         old_xls_file = f"{base_name}_olds-{timestamp}.xlsx"
 
