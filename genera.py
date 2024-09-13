@@ -1,26 +1,24 @@
-import os
 import pandas as pd
 import argparse
 import unidecode
-from datetime import datetime
 
 # Funció per generar l'adreça de correu electrònic correctament
-def generar_email(nom_complet, chars):
+def generar_email(nom_complet, chars_llinatges, chars_nom):
     nom_complet = nom_complet.split(", ")
     llinatges = nom_complet[0].split()  # Separar els llinatges
     noms = nom_complet[1].split()       # Separar els noms (pot ser compost)
 
-    # Tractar el cas especial on el nom comença amb "LL"
+    # Agafar els primers chars_nom caràcters del primer nom (pot ser compost)
     inicials_nom = ''
     for nom in noms[:2]:
         if nom.startswith("LL"):
             inicials_nom += 'll'
         else:
-            inicials_nom += nom[0].lower()
+            inicials_nom += nom[:chars_nom].lower()
 
     # Agafar el primer llinatge complet i el nombre de caràcters especificats del segon llinatge (si n'hi ha)
     primer_llinatge = llinatges[0].lower()  # Primer llinatge complet
-    segon_llinatge = llinatges[1][:chars].lower() if len(llinatges) > 1 else ''  # Caràcters del segon llinatge segons el valor de `chars`
+    segon_llinatge = llinatges[1][:chars_llinatges].lower() if len(llinatges) > 1 else ''  # Caràcters del segon llinatge segons el valor de `chars_llinatges`
 
     # Netejar caràcters especials com accents, ñ, ç
     inicials_nom = unidecode.unidecode(inicials_nom)
@@ -44,32 +42,26 @@ def llegir_fitxer(input_file):
     return df
 
 # Funció principal per llegir el CSV/Excel i generar el nou arxiu amb correus
-def generar_csv_i_excel_amb_emails(input_file, password, org_unit_path, output_base, chars):
+def generar_csv_i_excel_amb_emails(input_file, password, org_unit_path, output_base, chars_llinatges, chars_nom):
     # Llegir el fitxer (sigui CSV o Excel)
     df = llegir_fitxer(input_file)
-    
-    # Crear la carpeta logs si no existeix
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
+    print("____________________________")
+    print(f"chars_lletra_llegint = {chars_llinatges}, chars_nom_llegint = {chars_nom}")
+    print("____________________________")
 
-    # Crear el fitxer de log dins de la carpeta logs
-    log_file = os.path.join('logs', datetime.now().strftime(f"%Y-%m-%d-%H-%M-%S-{output_base}.log"))
-
-    with open(log_file, 'a') as log:
-        log.write(f"Creació del fitxer {output_base}.csv i {output_base}.xlsx\n")
-    
     # Crear noves columnes per a Email Address, Password i Org Unit Path
-    df['Email Address'] = df['Llinatges i nom'].apply(lambda x: generar_email(x, chars))
+    df['Email Address'] = df['Llinatges i nom'].apply(lambda x: generar_email(x, chars_llinatges, chars_nom))
     df['Password'] = password
     df['Org Unit Path'] = org_unit_path
     
-    # Separar les columnes de "Llinatges i nom" en "First Name" i "Last Name"
-    df_output = df['Llinatges i nom'].str.split(", ", expand=True)
-    df['Last Name'] = df_output[0]
-    df['First Name'] = df_output[1]
-
     # Seleccionar les columnes necessàries per a l'arxiu de sortida
-    df_output = df[['First Name', 'Last Name', 'Email Address', 'Password', 'Org Unit Path']]
+    df_output = df[['Llinatges i nom', 'Llinatges i nom', 'Email Address', 'Password', 'Org Unit Path']]
+    
+    # Separar les columnes de "Llinatges i nom" en "First Name" i "Last Name"
+    df_output[['First Name', 'Last Name']] = df['Llinatges i nom'].str.split(", ", expand=True)
+
+    # Reordenar les columnes
+    df_output = df_output[['First Name', 'Last Name', 'Email Address', 'Password', 'Org Unit Path']]
 
     # Generar els noms de fitxers per a CSV i Excel utilitzant el mateix nom base
     output_csv = f"{output_base}.csv"
@@ -91,7 +83,8 @@ if __name__ == '__main__':
     parser.add_argument('input_file', type=str, help='El fitxer CSV o Excel d\'entrada.')
     parser.add_argument('--output', type=str, required=True, help='El nom base per als fitxers de sortida (sense extensió).')
     parser.add_argument('--chars', type=int, default=2, help='Nombre de caràcters a agafar del segon llinatge (per defecte: 2).')
+    parser.add_argument('--chars-nom', type=int, default=1, help='Nombre de caràcters a agafar del nom (per defecte: 1).')
 
     args = parser.parse_args()
     
-    generar_csv_i_excel_amb_emails(args.input_file, args.password, args.org_unit_path, args.output, args.chars)
+    generar_csv_i_excel_amb_emails(args.input_file, args.password, args.org_unit_path, args.output, args.chars, args.chars_nom)
