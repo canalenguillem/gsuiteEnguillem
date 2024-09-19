@@ -82,7 +82,7 @@ if __name__ == '__main__':
     parser.add_argument('org_unit_path', type=str, help="El camí d'Org Unit Path.")
     parser.add_argument('input_file', type=str, help='El fitxer CSV o Excel d\'entrada.')
     parser.add_argument('--output', type=str, required=True, help='El nom base per als fitxers de sortida (sense extensió).')
-    parser.add_argument('--chars', type=int, default=2, help='Nombre de caràcters a agafar del segon llinatge (per defecte: 2).')
+    parser.add_argument('--chars', type=int, default=1, help='Nombre de caràcters a agafar del segon llinatge (per defecte: 2).')
     parser.add_argument('--chars-nom', type=int, default=1, help='Nombre de caràcters a agafar del nom (per defecte: 1).')
 
     args = parser.parse_args()
