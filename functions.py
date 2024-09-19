@@ -63,15 +63,21 @@ def connectar_amb_google(credentials_file, admin_email):
 # Funció per comprovar si un usuari existeix i obtenir la seva unitat organitzativa i nom complet
 def usuari_existeix(service, email):
     try:
-        # Fer una petició per obtenir informació sobre l'usuari
+        # Hacer una solicitud para obtener información del usuario
         usuari = service.users().get(userKey=email).execute()
-        org_unit_path = usuari.get('orgUnitPath', 'Sense assignar')  # Obtenir l'orgUnitPath de l'usuari
+        
+        # Obtener el orgUnitPath, nombres y apellidos del usuario
+        org_unit_path = usuari.get('orgUnitPath', 'Sense assignar')
         nom = usuari['name']['givenName']
         cognoms = usuari['name']['familyName']
-        return True, org_unit_path, nom, cognoms
+        
+        # Obtener el tiempo de creación del usuario
+        creation_time = usuari.get('creationTime', None)  # Obtener el campo creationTime
+        
+        return True, org_unit_path, nom, cognoms, creation_time
     except Exception as e:
         print(f"L'usuari {email} no existeix.")
-        return False, None, None, None
+        return False, None, None, None, None
 
 # Funció per actualitzar la unitat organitzativa d'un usuari
 def actualitzar_unitat_organitzativa(service, email, nova_unitat):

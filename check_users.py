@@ -33,11 +33,24 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users=
         password = row['Password']
         org_unit_path = row['Org Unit Path']
 
-        existeix, org_unit_actual, nom_servidor, cognoms_servidor = usuari_existeix(service, email)
+        existeix, org_unit_actual, nom_servidor, cognoms_servidor, creation_time = usuari_existeix(service, email)
         if existeix:
             # Comparar noms i cognoms amb el que hi ha al servidor
             if first_name.lower() == nom_servidor.lower() and last_name.lower() == cognoms_servidor.lower():
                 print(f"L'usuari {email} ja existeix i els noms coincideixen.")
+                
+                # Verificar la data de creació del compte
+                if creation_time:
+                    creation_date = datetime.strptime(creation_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+                    current_year = datetime.now().year
+                    # Si l'usuari va ser creat al setembre de l'any actual, posem "esliceu2024" com a contrasenya
+                    if creation_date.year == current_year and creation_date.month == 9:
+                        row['Password'] = 'esliceu2024'
+                    else:
+                        row['Password'] = '****'  # Si no és setembre o l'any no és el mateix
+                else:
+                    row['Password'] = '****'  # Si no hi ha data de creació, també posem "****"
+
                 # Comprovar si s'ha de canviar la unitat organitzativa
                 if org_unit_actual != org_unit_path:
                     resposta = input(f"L'usuari {email} està a {org_unit_actual}. Vols actualitzar-lo a {org_unit_path}? (S/n): ").strip().lower()
@@ -59,7 +72,7 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users=
                     continue  # No fem res i passem a la següent fila
             
             # Afegeix l'usuari existent a la llista d'usuaris existents
-            usuaris_existents.append(row.drop(labels=['Password']))
+            usuaris_existents.append(row)  # Ara incloem la contrasenya
         else:
             # Si l'opció --create-users és S, crear l'usuari
             if create_users.upper() == 'S':
@@ -80,7 +93,6 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users=
         # Crear un nou DataFrame amb els usuaris que no existeixen
         df_no_existents = pd.DataFrame(usuaris_no_existents)
 
-
         # Generar el nom dels fitxers amb el sufix news-any-mes-dia-hora
         new_csv_file = f"{base_name}_news-{timestamp}.csv"
         new_xls_file = f"{base_name}_news-{timestamp}.xlsx"
@@ -97,7 +109,7 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users=
 
     # Si hi ha usuaris existents, generar un fitxer CSV i Excel amb aquests usuaris
     if usuaris_existents:
-        # Crear un DataFrame amb els usuaris que ja existien, sense la columna Password
+        # Crear un DataFrame amb els usuaris que ja existien, incloent la columna Password
         df_existents = pd.DataFrame(usuaris_existents)
 
         # Generar el nom dels fitxers amb el sufix olds-any-mes-dia-hora
