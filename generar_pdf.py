@@ -83,7 +83,7 @@ if __name__ == '__main__':
     # Utilitzar argparse per gestionar els paràmetres de la línia de comandes
     parser = argparse.ArgumentParser(description='Generar etiquetes en PDF a partir d\'un CSV.')
     parser.add_argument('--csv-file', type=str, required=True, help='El fitxer CSV amb els usuaris.')
-    parser.add_argument('--output-pdf', type=str, default='etiquetes.pdf', help='El nom del fitxer PDF de sortida.')
+    parser.add_argument('--output-pdf', type=str, required=True, help='El nom del fitxer PDF de sortida.')
 
     # Obtenir els arguments
     args = parser.parse_args()

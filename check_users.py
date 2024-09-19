@@ -7,8 +7,33 @@ import os
 from datetime import datetime
 from functions import connectar_amb_google, usuari_existeix, actualitzar_unitat_organitzativa, actualitzar_nom_i_cognoms, registrar_canvi, crear_usuari
 
+quants = 0
+canviar = 0
+
+# Funció per actualitzar el password i forçar canvi de contrasenya en proper login
+def actualitzar_password(service, email, new_password, force_password_change, log_file):
+    try:
+        body = {
+            'password': new_password,
+            'changePasswordAtNextLogin': force_password_change
+        }
+        service.users().update(userKey=email, body=body).execute()
+        if force_password_change:
+            print(f"L'usuari {email} haurà de canviar la contrasenya en el proper inici de sessió.")
+        else:
+            global canviar
+            canviar += 1
+            print(f"canviar {canviar}")
+            print(f"L'usuari {email} és candidat a un canvi de contrasenya.")
+        registrar_canvi(log_file, f"Contrasenya actualitzada per a {email}. Canvi de contrasenya: {'Obligatori' if force_password_change else 'No obligatori'}.")
+        return True
+    except Exception as e:
+        print(f"No s'ha pogut actualitzar la contrasenya per a {email}: {e}")
+        registrar_canvi(log_file, f"Error en actualitzar la contrasenya per a {email}: {e}")
+        return False
+
 # Funció principal per llegir el CSV, comprovar si els correus existeixen, gestionar la unitat organitzativa, crear usuaris i generar els CSV amb els usuaris nous i els existents
-def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users='N'):
+def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users='N', change_password='N'):
     # Connectar-se amb l'API de Google
     service = connectar_amb_google(credentials_file, admin_email)
 
@@ -16,7 +41,7 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users=
     df = pd.read_csv(csv_file)
 
     # Generar el nom base del fitxer CSV per usar-lo més tard en crear els fitxers news i olds
-    base_name = os.path.splitext(csv_file)[0]  # Afegeix aquesta línia
+    base_name = os.path.splitext(csv_file)[0]
 
     # Generar el nom del fitxer log basat en la data i hora actuals
     log_file = datetime.now().strftime(f"%Y-%m-%d-%H-%M-%S-{os.path.basename(csv_file)}.log")
@@ -27,6 +52,8 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users=
 
     # Recórrer cada fila del CSV i comprovar si l'usuari existeix
     for index, row in df.iterrows():
+        global quants
+        quants += 1
         email = row['Email Address']
         first_name = row['First Name']
         last_name = row['Last Name']
@@ -34,6 +61,7 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users=
         org_unit_path = row['Org Unit Path']
 
         existeix, org_unit_actual, nom_servidor, cognoms_servidor, creation_time = usuari_existeix(service, email)
+
         if existeix:
             # Comparar noms i cognoms amb el que hi ha al servidor
             if first_name.lower() == nom_servidor.lower() and last_name.lower() == cognoms_servidor.lower():
@@ -43,14 +71,22 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users=
                 if creation_time:
                     creation_date = datetime.strptime(creation_time, "%Y-%m-%dT%H:%M:%S.%fZ")
                     current_year = datetime.now().year
-                    # Si l'usuari va ser creat al setembre de l'any actual, posem "esliceu2024" com a contrasenya
-                    if creation_date.year == current_year and creation_date.month == 9:
-                        row['Password'] = 'esliceu2024'
-                    else:
-                        row['Password'] = '****'  # Si no és setembre o l'any no és el mateix
-                else:
-                    row['Password'] = '****'  # Si no hi ha data de creació, també posem "****"
 
+                    # Si l'usuari va ser creat abans de setembre de l'any actual, mostrar password com "*****"
+                    if creation_date.year < current_year or (creation_date.year == current_year and creation_date.month < 9):
+                        row['Password'] = "*****"
+                        print(f"L'usuari {email} va ser creat abans de setembre {current_year}, contrasenya no canviada.")
+
+                    # Si l'usuari va ser creat al setembre de l'any actual, canviar contrasenya
+                    elif creation_date.year == current_year and creation_date.month == 9:
+                        global canviar
+                        canviar += 1
+                        if change_password.upper() == 'S':
+                            actualitzar_password(service, email, password, True, log_file)
+                        else:
+                            print(f"L'usuari {email} és candidat a canvi de contrasenya (creat setembre {current_year}).")
+                            registrar_canvi(log_file, f"Usuari {email} candidat a canvi de contrasenya.")
+                
                 # Comprovar si s'ha de canviar la unitat organitzativa
                 if org_unit_actual != org_unit_path:
                     resposta = input(f"L'usuari {email} està a {org_unit_actual}. Vols actualitzar-lo a {org_unit_path}? (S/n): ").strip().lower()
@@ -72,7 +108,7 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users=
                     continue  # No fem res i passem a la següent fila
             
             # Afegeix l'usuari existent a la llista d'usuaris existents
-            usuaris_existents.append(row)  # Ara incloem la contrasenya
+            usuaris_existents.append(row)
         else:
             # Si l'opció --create-users és S, crear l'usuari
             if create_users.upper() == 'S':
@@ -85,49 +121,35 @@ def comprovar_usuaris_csv(credentials_file, admin_email, csv_file, create_users=
             usuaris_no_existents.append(row)
 
     # Guarda els fitxers news i olds segons les funcions ja definides
-
     # Si hi ha usuaris que no existeixen, generar un nou CSV i un fitxer Excel
     # Generar el timestamp per al nom del fitxer news
     timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M")
     if usuaris_no_existents:
-        # Crear un nou DataFrame amb els usuaris que no existeixen
         df_no_existents = pd.DataFrame(usuaris_no_existents)
-
-        # Generar el nom dels fitxers amb el sufix news-any-mes-dia-hora
         new_csv_file = f"{base_name}_news-{timestamp}.csv"
         new_xls_file = f"{base_name}_news-{timestamp}.xlsx"
-
-        # Guardar el nou CSV amb els usuaris que no existeixen
         df_no_existents.to_csv(new_csv_file, index=False)
         print(f"S'ha creat el fitxer {new_csv_file} amb els usuaris que no existeixen.")
         registrar_canvi(log_file, f"Creat el fitxer {new_csv_file} amb els usuaris que no existeixen")
-
-        # Guardar el nou Excel amb els usuaris que no existeixen
         df_no_existents.to_excel(new_xls_file, index=False, engine='openpyxl')
         print(f"S'ha creat el fitxer {new_xls_file} amb els usuaris que no existeixen.")
         registrar_canvi(log_file, f"Creat el fitxer {new_xls_file} amb els usuaris que no existeixen")
 
     # Si hi ha usuaris existents, generar un fitxer CSV i Excel amb aquests usuaris
     if usuaris_existents:
-        # Crear un DataFrame amb els usuaris que ja existien, incloent la columna Password
         df_existents = pd.DataFrame(usuaris_existents)
-
-        # Generar el nom dels fitxers amb el sufix olds-any-mes-dia-hora
         old_csv_file = f"{base_name}_olds-{timestamp}.csv"
         old_xls_file = f"{base_name}_olds-{timestamp}.xlsx"
-
-        # Guardar el fitxer CSV amb els usuaris existents
         df_existents.to_csv(old_csv_file, index=False)
         print(f"S'ha creat el fitxer {old_csv_file} amb els usuaris que ja existien.")
         registrar_canvi(log_file, f"Creat el fitxer {old_csv_file} amb els usuaris que ja existien")
-
-        # Guardar el fitxer Excel amb els usuaris existents
         df_existents.to_excel(old_xls_file, index=False, engine='openpyxl')
         print(f"S'ha creat el fitxer {old_xls_file} amb els usuaris que ja existien.")
         registrar_canvi(log_file, f"Creat el fitxer {old_xls_file} amb els usuaris que ja existien")
     else:
         print("No hi ha usuaris existents per a generar un fitxer.")
         registrar_canvi(log_file, "No hi ha usuaris existents per a generar un fitxer.")
+
 
 if __name__ == '__main__':
     # Utilitzar argparse per gestionar els paràmetres de la línia de comandes
@@ -138,9 +160,11 @@ if __name__ == '__main__':
     parser.add_argument('--admin-email', type=str, required=True, help='El correu electrònic de l\'administrador del domini.')
     parser.add_argument('--csv-file', type=str, required=True, help='El fitxer CSV amb els usuaris a comprovar.')
     parser.add_argument('--create-users', type=str, default='N', help='(Opcional) Si s\'han de crear els usuaris que no existeixen (S per crear-los, N per defecte).')
+    parser.add_argument('--change-password', type=str, default='N', help='(Opcional) Si s\'han d\'actualitzar les contrasenyes dels usuaris creats al setembre (S per actualitzar-les, N per defecte).')
 
     # Obtenir els arguments
     args = parser.parse_args()
 
     # Cridar la funció per comprovar els usuaris i crear-los si no existeixen i si --create-users és S
-    comprovar_usuaris_csv(args.credentials_file, args.admin_email, args.csv_file, args.create_users)
+    comprovar_usuaris_csv(args.credentials_file, args.admin_email, args.csv_file, args.create_users, args.change_password)
+    print(f"quants {quants} canvis pass {canviar}")
