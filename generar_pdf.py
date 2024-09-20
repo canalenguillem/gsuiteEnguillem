@@ -3,6 +3,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from textwrap import wrap
+import os
 
 # Funció per separar el nom en llinatges i nom propi i limitar els llinatges a 12 caràcters
 def formatejar_nom_com_llinatges_i_nom(first_name, last_name):
@@ -13,6 +14,13 @@ def formatejar_nom_com_llinatges_i_nom(first_name, last_name):
 
 # Funció per generar les etiquetes en PDF
 def generar_pdf_amb_etiquetes(csv_file, output_pdf):
+    # Crear la carpeta "pdf" si no existeix
+    if not os.path.exists("pdf"):
+        os.makedirs("pdf")
+
+    # Definir el camí complet del fitxer PDF dins la carpeta "pdf"
+    output_pdf = os.path.join("pdf", output_pdf)
+
     # Llegir el CSV
     df = pd.read_csv(csv_file)
 

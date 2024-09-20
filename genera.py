@@ -1,6 +1,7 @@
 import pandas as pd
 import argparse
 import unidecode
+import os
 
 # Funció per generar l'adreça de correu electrònic correctament
 def generar_email(nom_complet, chars_llinatges, chars_nom):
@@ -43,11 +44,13 @@ def llegir_fitxer(input_file):
 
 # Funció principal per llegir el CSV/Excel i generar el nou arxiu amb correus
 def generar_csv_i_excel_amb_emails(input_file, password, org_unit_path, output_base, chars_llinatges, chars_nom):
+    # Crear la carpeta "data" si no existeix
+    if not os.path.exists("data"):
+        os.makedirs("data")
+    
     # Llegir el fitxer (sigui CSV o Excel)
     df = llegir_fitxer(input_file)
-    print("____________________________")
-    print(f"chars_lletra_llegint = {chars_llinatges}, chars_nom_llegint = {chars_nom}")
-    print("____________________________")
+    print(f"chars_llinatges = {chars_llinatges}, chars_nom = {chars_nom}")
 
     # Crear noves columnes per a Email Address, Password i Org Unit Path
     df['Email Address'] = df['Llinatges i nom'].apply(lambda x: generar_email(x, chars_llinatges, chars_nom))
@@ -63,17 +66,17 @@ def generar_csv_i_excel_amb_emails(input_file, password, org_unit_path, output_b
     # Reordenar les columnes
     df_output = df_output[['First Name', 'Last Name', 'Email Address', 'Password', 'Org Unit Path']]
 
-    # Generar els noms de fitxers per a CSV i Excel utilitzant el mateix nom base
-    output_csv = f"{output_base}.csv"
-    output_xls = f"{output_base}.xlsx"
+    # Generar els noms de fitxers per a CSV i Excel utilitzant el mateix nom base dins de la carpeta "data"
+    output_csv = os.path.join("data", f"{output_base}.csv")
+    output_xls = os.path.join("data", f"{output_base}.xlsx")
 
     # Guardar el DataFrame resultant en un nou CSV
     df_output.to_csv(output_csv, index=False)
-    print(f"Fitxer CSV guardat correctament com {output_csv}")
+    print(f"Fitxer CSV guardat correctament a {output_csv}")
 
     # Guardar el DataFrame resultant en un nou Excel
     df_output.to_excel(output_xls, index=False, engine='openpyxl')
-    print(f"Fitxer Excel guardat correctament com {output_xls}")
+    print(f"Fitxer Excel guardat correctament a {output_xls}")
 
 # Parser d'arguments per acceptar paràmetres des de la línia de comandes
 if __name__ == '__main__':

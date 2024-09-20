@@ -60,24 +60,25 @@ def connectar_amb_google(credentials_file, admin_email):
     service = build('admin', 'directory_v1', credentials=delegated_credentials)
     return service
 
-# Funció per comprovar si un usuari existeix i obtenir la seva unitat organitzativa i nom complet
+# Funció per comprovar si un usuari existeix i obtenir la seva informació
 def usuari_existeix(service, email):
     try:
-        # Hacer una solicitud para obtener información del usuario
+        # Fer una petició per obtenir informació sobre l'usuari
         usuari = service.users().get(userKey=email).execute()
-        
-        # Obtener el orgUnitPath, nombres y apellidos del usuario
-        org_unit_path = usuari.get('orgUnitPath', 'Sense assignar')
-        nom = usuari['name']['givenName']
-        cognoms = usuari['name']['familyName']
-        
-        # Obtener el tiempo de creación del usuario
-        creation_time = usuari.get('creationTime', None)  # Obtener el campo creationTime
-        
-        return True, org_unit_path, nom, cognoms, creation_time
+        org_unit_path = usuari.get('orgUnitPath', 'Sense assignar')  # Obtenir l'orgUnitPath de l'usuari
+        nom = usuari['name']['givenName']  # Obtenir el nom
+        cognoms = usuari['name']['familyName']  # Obtenir els cognoms
+        creation_time = usuari.get('creationTime', None)  # Data de creació del compte
+        last_login_time = usuari.get('lastLoginTime', 'Mai')  # Darrera connexió
+
+        # Comprovar si la darrera connexió és 1970, és a dir, que mai no s'ha connectat
+        if last_login_time == '1970-01-01T00:00:00.000Z':
+            last_login_time = 'Mai'
+
+        return True, org_unit_path, nom, cognoms, creation_time, last_login_time
     except Exception as e:
-        print(f"L'usuari {email} no existeix.")
-        return False, None, None, None, None
+        print(f"L'usuari {email} no existeix o no es pot recuperar la informació")
+        return False, None, None, None, None, None
 
 # Funció per actualitzar la unitat organitzativa d'un usuari
 def actualitzar_unitat_organitzativa(service, email, nova_unitat):
